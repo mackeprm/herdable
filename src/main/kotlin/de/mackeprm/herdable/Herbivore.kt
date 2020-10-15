@@ -1,38 +1,75 @@
 package de.mackeprm.herdable
 
 import processing.core.PApplet
+import java.awt.geom.Point2D
+import kotlin.math.atan2
+import kotlin.random.Random
 
-data class Point2D(val x: Float, val y: Float)
 
-class Herbivore(private var sketch: PApplet, private var x: Float, private var y: Float) : Actor {
-    var xSpeed: Float;
-    var ySpeed: Float;
-    var target: Point2D;
+enum class HerbivoreMode {
+    IDLE, ROAMING, FORAGING, FLEEING, FOLLOWING
+}
+
+class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Float) : Actor {
+    private var speed: Float = 10F
+    private var direction: Float = 0F
+    private val size = 15F
+    private val random = Random.Default
+    private var currentMode = HerbivoreMode.ROAMING
 
     init {
-        xSpeed = sketch.random(-10.0F, 10.0F)
-        ySpeed = sketch.random(-10.0F, 10.0F)
-        target = Point2D(sketch.random(0F, sketch.width.toFloat()), sketch.random(0F, sketch.height.toFloat()))
+        //TODO baseSpeed, topSpeed
+        speed = random.nextFloat() * 2
+        direction = (random.nextFloat() * 360)
+        println("New Herbivore: $speed, $direction")
     }
 
+    private fun calculateNextTargetPoint(): Point2D.Float {
+        val velocityVector = Point2D.Float(speed, speed)
+        val newVector = rotate(velocityVector, direction)
+        return Point2D.Float(
+            currentPos.x + newVector.x,
+            currentPos.y + newVector.y
+        )
+    }
 
     override fun step() {
-        //TODO: Are we at the target? If not, randomly walk towards it.
-        x += xSpeed
-        if (x < 0 || x > sketch.width) {
-            xSpeed *= -1f
+        when (currentMode) {
+            HerbivoreMode.ROAMING -> {
+                direction = ((direction + (random.nextFloat() - 0.5F) * 10) % 360)
+            }
+            else -> throw IllegalStateException("Not Implemented")
         }
-        y += ySpeed
-        if (y < 0 || y > sketch.height) {
-            ySpeed *= -1f
+        var targetPos = calculateNextTargetPoint()
+        while (outOfBounds(targetPos)) {
+            direction += ((direction + (random.nextFloat() - 0.5F) * 180) % 360)
+            targetPos = calculateNextTargetPoint()
         }
+        currentPos = targetPos
     }
+
+    private fun outOfBounds(targetPos: Point2D.Float) =
+        targetPos.x > 1000 || targetPos.x < 0 || targetPos.y > 800 || targetPos.y < 0
 
     override fun render() {
-        sketch.fill(255F, 0F, 0F);
-        sketch.ellipse(target.x, target.y, 10F, 10F)
-        sketch.fill(255F, 255F, 255F);
-        sketch.ellipse(x, y, 10F, 10F)
+        //TODO color should be set depending on the current mode
+        sketch.fill(255F, 255F, 255F)
+        sketch.ellipse(currentPos.x, currentPos.y, size, size)
+
+        val targetPos = calculateNextTargetPoint()
+        sketch.fill(255F, 0F, 0F)
+        sketch.arrow(currentPos.x, currentPos.y, targetPos.x, targetPos.y)
     }
 
+}
+
+fun PApplet.arrow(x1: Float, y1: Float, x2: Float, y2: Float) {
+    this.line(x1, y1, x2, y2)
+    this.pushMatrix()
+    this.translate(x2, y2)
+    val a: Float = atan2(x1 - x2, y2 - y1)
+    this.rotate(a)
+    this.line(0F, 0F, -3F, -3F)
+    this.line(0F, 0F, 3F, -3F)
+    this.popMatrix()
 }
