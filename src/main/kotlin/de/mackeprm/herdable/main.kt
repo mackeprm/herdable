@@ -29,6 +29,22 @@ class Simulator : PApplet() {
         })
     }
 
+    fun getSurroundingActors(actor: Actor) : List<Actor> {
+        val currentActorPos = actor.getCurrentPosition()
+        val result: ArrayList<Actor> = ArrayList()
+        for(other in this.actors) {
+            if(other != actor) {
+                val otherActorPos = other.getCurrentPosition()
+                val distance = Point2D.distance(currentActorPos.getX(),currentActorPos.getY(),
+                    otherActorPos.getX(),otherActorPos.getY());
+                if(distance <= 50) {
+                    result.add(other);
+                }
+            }
+        }
+        return result;
+    }
+
     private fun drawMenu() {
         for (b in buttons) {
             b.render()

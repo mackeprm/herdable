@@ -3,6 +3,8 @@ package de.mackeprm.herdable
 import processing.core.PApplet
 import java.awt.Color
 import java.awt.geom.Point2D
+import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.math.atan2
 import kotlin.random.Random
 
@@ -37,8 +39,12 @@ class IdleBehaviour(private val startingPos: Point2D.Float) {
     }
 
 }
+class HerbivoreMessage() {
 
-class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Float) : Actor {
+}
+
+class Herbivore(private val sketch: Simulator, private var currentPos: Point2D.Float) : Actor {
+    private val id: UUID = UUID.randomUUID();
     private var speed: Float = 10F
     private var direction: Float = 0F
     private val size = 15F
@@ -46,7 +52,7 @@ class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Flo
     private var currentMode = HerbivoreMode.ROAMING
     private var idleBehaviour: IdleBehaviour = IdleBehaviour(currentPos)
     private var idleCounter = 0;
-    //TODO inbox
+    private var inbox: List<HerbivoreMessage> = ArrayList();
 
     init {
         //TODO baseSpeed, topSpeed
@@ -65,7 +71,12 @@ class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Flo
     }
 
     override fun step() {
-        //TODO sense
+        //TODO inbox.
+        val surroundingActors = sketch.getSurroundingActors(this)
+        if(surroundingActors.size > 0) {
+            println("I see somebody: $surroundingActors")
+        }
+
         when (currentMode) {
             HerbivoreMode.ROAMING -> {
                 direction = ((direction + (random.nextFloat() - 0.5F) * 10) % 360)
@@ -118,6 +129,15 @@ class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Flo
         sketch.stroke(255F, 255F, 255F)
         sketch.arrow(currentPos.x, currentPos.y, targetPos.x, targetPos.y)
     }
+
+    override fun getCurrentPosition(): Point2D.Float {
+        return currentPos;
+    }
+
+    override fun toString(): String {
+        return "Herbivore(id=$id)"
+    }
+
 
 }
 
