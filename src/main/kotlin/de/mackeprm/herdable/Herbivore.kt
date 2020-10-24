@@ -1,13 +1,41 @@
 package de.mackeprm.herdable
 
 import processing.core.PApplet
+import java.awt.Color
 import java.awt.geom.Point2D
 import kotlin.math.atan2
 import kotlin.random.Random
 
+enum class HerbivoreMode(val color: Color) {
+    IDLE(Color.LIGHT_GRAY),
+    ROAMING(COLORS.LIGHT_BLUE),
+    FORAGING(Color.ORANGE),
+    FLEEING(Color.RED),
+    FOLLOWING(Color.GREEN)
+}
 
-enum class HerbivoreMode {
-    IDLE, ROAMING, FORAGING, FLEEING, FOLLOWING
+class IdleBehaviour(private val startingPos: Point2D.Float) {
+    var counter = 10
+
+    init {
+        // Calculate a random point within an area of the starting point.
+        // This should be bound by the play-area.
+    }
+
+    fun step() {
+        // TODO("Not yet implemented")
+        counter--
+    }
+
+    fun getNextPos(): Point2D.Float {
+        //TODO("Not yet implemented")
+        return startingPos
+    }
+
+    fun isFinished(): Boolean {
+        return counter <= 0;
+    }
+
 }
 
 class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Float) : Actor {
@@ -16,6 +44,9 @@ class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Flo
     private val size = 15F
     private val random = Random.Default
     private var currentMode = HerbivoreMode.ROAMING
+    private var idleBehaviour: IdleBehaviour = IdleBehaviour(currentPos)
+    private var idleCounter = 0;
+    //TODO inbox
 
     init {
         //TODO baseSpeed, topSpeed
@@ -34,30 +65,57 @@ class Herbivore(private val sketch: PApplet, private var currentPos: Point2D.Flo
     }
 
     override fun step() {
+        //TODO sense
         when (currentMode) {
             HerbivoreMode.ROAMING -> {
                 direction = ((direction + (random.nextFloat() - 0.5F) * 10) % 360)
+                currentPos = moveForward()
+                idleCounter++;
+                if (random.nextInt(idleCounter, 10_000) > 9900) {
+                    currentMode = HerbivoreMode.IDLE;
+                    idleBehaviour = IdleBehaviour(currentPos)
+                }
+            }
+            HerbivoreMode.IDLE -> {
+                if (idleBehaviour.isFinished()) {
+                    idleCounter = 0;
+                    if(random.nextInt(0, 10) > 3) {
+                        currentMode = HerbivoreMode.ROAMING
+                    } else {
+                        idleBehaviour = IdleBehaviour(currentPos)
+                    }
+                } else {
+                    idleBehaviour.step()
+                    currentPos = idleBehaviour.getNextPos()
+                }
             }
             else -> throw IllegalStateException("Not Implemented")
         }
+    }
+
+    private fun moveForward(): Point2D.Float {
         var targetPos = calculateNextTargetPoint()
         while (outOfBounds(targetPos)) {
             direction += ((direction + (random.nextFloat() - 0.5F) * 180) % 360)
             targetPos = calculateNextTargetPoint()
         }
-        currentPos = targetPos
+        return targetPos
     }
 
     private fun outOfBounds(targetPos: Point2D.Float) =
         targetPos.x > 1000 || targetPos.x < 0 || targetPos.y > 800 || targetPos.y < 0
 
     override fun render() {
-        //TODO color should be set depending on the current mode
-        sketch.fill(255F, 255F, 255F)
+        sketch.fill(
+            currentMode.color.red.toFloat(),
+            currentMode.color.green.toFloat(),
+            currentMode.color.blue.toFloat()
+        )
         sketch.ellipse(currentPos.x, currentPos.y, size, size)
 
         val targetPos = calculateNextTargetPoint()
-        sketch.fill(255F, 0F, 0F)
+        sketch.fill(255F, 255F, 255F)
+        sketch.stroke(255F, 255F, 255F)
         sketch.arrow(currentPos.x, currentPos.y, targetPos.x, targetPos.y)
     }
 

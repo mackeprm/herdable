@@ -1,5 +1,6 @@
 package de.mackeprm.herdable
 
+import java.awt.Color
 import java.awt.geom.Point2D
 import kotlin.math.cos
 import kotlin.math.sin
@@ -15,4 +16,11 @@ fun rotate(point: Point2D.Float, degree: Float): Point2D.Float {
     val newY: Double = point.y * cosb + point.x * sinb
 
     return Point2D.Float(newX.toFloat(), newY.toFloat());
+}
+
+class COLORS {
+    companion object {
+        val LIGHT_BLUE = Color(140, 184, 255)
+
+    }
 }
