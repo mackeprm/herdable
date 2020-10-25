@@ -1,6 +1,7 @@
 package de.mackeprm.herdable
 
 import processing.core.PApplet
+import processing.core.PApplet.lerp
 import java.awt.Color
 import java.awt.geom.Point2D
 import java.util.*
@@ -12,6 +13,7 @@ enum class HerbivoreMode(val color: Color) {
     IDLE(Color.LIGHT_GRAY),
     ROAMING(COLORS.LIGHT_BLUE),
     FORAGING(Color.ORANGE),
+    EATING(COLORS.DARK_BLUE),
     FLEEING(Color.RED),
     FOLLOWING(Color.GREEN)
 }
@@ -35,24 +37,69 @@ class IdleBehaviour(private val startingPos: Point2D.Float) {
     }
 
     fun isFinished(): Boolean {
-        return counter <= 0;
+        return counter <= 0
     }
 
 }
+
+//TODO Error-case handling: if 2 herbivores want to eat the same foodItem
+class EatingBehaviour(
+    private val startingPos: Point2D.Float,
+    val foodItem: Actor
+) {
+    //TODO baseSpeed, topSpeed
+    private var progress = 0.1F
+    private var arrivedAtFood = false
+    private var eatingCounter = 20
+
+    fun step() {
+        if (arrivedAtFood) {
+            eatingCounter -= 1
+        } else {
+            progress += 0.04F
+        }
+    }
+
+    fun getNextPos(): Point2D.Float {
+        val nextX = lerp(startingPos.x, foodItem.getCurrentPosition().x, progress)
+        val nextY = lerp(startingPos.y, foodItem.getCurrentPosition().y, progress)
+        if (Point2D.distance(
+                nextX.toDouble(),
+                nextY.toDouble(),
+                foodItem.getCurrentPosition().x.toDouble(),
+                foodItem.getCurrentPosition().y.toDouble()
+            ) < 10
+        ) {
+            arrivedAtFood = true
+        }
+        return Point2D.Float(nextX, nextY)
+    }
+
+    fun isFinished(): Boolean {
+        return eatingCounter <= 0
+    }
+}
+
 class HerbivoreMessage() {
 
 }
 
 class Herbivore(private val sketch: Simulator, private var currentPos: Point2D.Float) : Actor {
-    private val id: UUID = UUID.randomUUID();
+    private val id: UUID = UUID.randomUUID()
     private var speed: Float = 10F
     private var direction: Float = 0F
     private val size = 15F
     private val random = Random.Default
     private var currentMode = HerbivoreMode.ROAMING
+
+    //IDLE
     private var idleBehaviour: IdleBehaviour = IdleBehaviour(currentPos)
-    private var idleCounter = 0;
-    private var inbox: List<HerbivoreMessage> = ArrayList();
+    private var idleCounter = 0
+
+    //EATING
+    private var eatingBehaviour: EatingBehaviour? = null
+
+    private var inbox: List<HerbivoreMessage> = ArrayList()
 
     init {
         //TODO baseSpeed, topSpeed
@@ -62,7 +109,8 @@ class Herbivore(private val sketch: Simulator, private var currentPos: Point2D.F
     }
 
     private fun calculateNextTargetPoint(): Point2D.Float {
-        val velocityVector = Point2D.Float(speed, speed)
+        //val velocityVector = Point2D.Float(speed, speed)
+        val velocityVector = Point2D.Float(speed, 0F)
         val newVector = rotate(velocityVector, direction)
         return Point2D.Float(
             currentPos.x + newVector.x,
@@ -71,26 +119,38 @@ class Herbivore(private val sketch: Simulator, private var currentPos: Point2D.F
     }
 
     override fun step() {
+        // SENSE
         //TODO inbox.
-        val surroundingActors = sketch.getSurroundingActors(this)
-        if(surroundingActors.size > 0) {
-            println("I see somebody: $surroundingActors")
+        val surroundingFood = sketch.getSurroundingActors(this, 80F, FoodItem::class)
+        val surroundingHerbivores = sketch.getSurroundingActors(this, 30F, Herbivore::class)
+
+        //THINK
+        if (surroundingFood.isNotEmpty()) {
+            if (currentMode != HerbivoreMode.EATING) {
+                this.direction = findDirection(this.currentPos, surroundingFood[0].getCurrentPosition()).toFloat();
+                this.eatingBehaviour = EatingBehaviour(this.currentPos, surroundingFood[0])
+                currentMode = HerbivoreMode.EATING
+            }
+        }
+        if (surroundingHerbivores.isNotEmpty()) {
+            println("I see somebody: $surroundingHerbivores")
         }
 
+        // ACT
         when (currentMode) {
             HerbivoreMode.ROAMING -> {
                 direction = ((direction + (random.nextFloat() - 0.5F) * 10) % 360)
                 currentPos = moveForward()
-                idleCounter++;
+                idleCounter++
                 if (random.nextInt(idleCounter, 10_000) > 9900) {
-                    currentMode = HerbivoreMode.IDLE;
+                    currentMode = HerbivoreMode.IDLE
                     idleBehaviour = IdleBehaviour(currentPos)
                 }
             }
             HerbivoreMode.IDLE -> {
                 if (idleBehaviour.isFinished()) {
-                    idleCounter = 0;
-                    if(random.nextInt(0, 10) > 3) {
+                    idleCounter = 0
+                    if (random.nextInt(0, 10) > 3) {
                         currentMode = HerbivoreMode.ROAMING
                     } else {
                         idleBehaviour = IdleBehaviour(currentPos)
@@ -98,6 +158,16 @@ class Herbivore(private val sketch: Simulator, private var currentPos: Point2D.F
                 } else {
                     idleBehaviour.step()
                     currentPos = idleBehaviour.getNextPos()
+                }
+            }
+            HerbivoreMode.EATING -> {
+                val currentEatingBehaviour = eatingBehaviour!!
+                if (currentEatingBehaviour.isFinished()) {
+                    sketch.removeActor(currentEatingBehaviour.foodItem)
+                    currentMode = HerbivoreMode.ROAMING
+                } else {
+                    currentEatingBehaviour.step()
+                    currentPos = currentEatingBehaviour.getNextPos()
                 }
             }
             else -> throw IllegalStateException("Not Implemented")
@@ -131,7 +201,7 @@ class Herbivore(private val sketch: Simulator, private var currentPos: Point2D.F
     }
 
     override fun getCurrentPosition(): Point2D.Float {
-        return currentPos;
+        return currentPos
     }
 
     override fun toString(): String {

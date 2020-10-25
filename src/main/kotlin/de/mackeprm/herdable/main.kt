@@ -3,13 +3,16 @@ package de.mackeprm.herdable
 import processing.core.PApplet
 import java.awt.geom.Point2D
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.reflect.KClass
 
 
 class Simulator : PApplet() {
-    private val actors = ArrayList<Actor>()
+    private val actors = ConcurrentLinkedQueue<Actor>()
     private val buttons = ArrayList<Button>()
 
     private var running = true
+    private var shiftPressed = false
 
     companion object Factory {
         fun run(args: Array<String>) {
@@ -29,20 +32,31 @@ class Simulator : PApplet() {
         })
     }
 
-    fun getSurroundingActors(actor: Actor) : List<Actor> {
+    //TODO can i move this into it's own ActorList class?
+    fun removeActor(actor: Actor) {
+        this.actors.remove(actor)
+    }
+
+    //TODO can i move this into it's own ActorList class?
+    //TODO can i get rid of clazz?
+    fun <T : Actor> getSurroundingActors(actor: Actor, distance: Float, clazz: KClass<T>): List<T> {
         val currentActorPos = actor.getCurrentPosition()
-        val result: ArrayList<Actor> = ArrayList()
-        for(other in this.actors) {
-            if(other != actor) {
+        val result: ArrayList<T> = ArrayList()
+        for (other in this.actors) {
+            if (other != actor) {
                 val otherActorPos = other.getCurrentPosition()
-                val distance = Point2D.distance(currentActorPos.getX(),currentActorPos.getY(),
-                    otherActorPos.getX(),otherActorPos.getY());
-                if(distance <= 50) {
-                    result.add(other);
+                val currentDistance = Point2D.distance(
+                    currentActorPos.getX(), currentActorPos.getY(),
+                    otherActorPos.getX(), otherActorPos.getY()
+                )
+                if (currentDistance <= distance) {
+                    if (clazz.isInstance(other)) {
+                        result.add(other as T)
+                    }
                 }
             }
         }
-        return result;
+        return result
     }
 
     private fun drawMenu() {
@@ -78,7 +92,27 @@ class Simulator : PApplet() {
                 return
             }
         }
-        actors.add(Herbivore(this, Point2D.Float(mouseX.toFloat(), mouseY.toFloat())))
+        if (shiftPressed) {
+            actors.add(FoodItem(this, Point2D.Float(mouseX.toFloat(), mouseY.toFloat())))
+        } else {
+            actors.add(Herbivore(this, Point2D.Float(mouseX.toFloat(), mouseY.toFloat())))
+        }
+    }
+
+    override fun keyPressed() {
+        if (this.key.toInt() == CODED) {
+            if (this.keyCode == SHIFT) {
+                this.shiftPressed = true
+            }
+        }
+    }
+
+    override fun keyReleased() {
+        if (this.key.toInt() == CODED) {
+            if (this.keyCode == SHIFT) {
+                this.shiftPressed = false
+            }
+        }
     }
 }
 
